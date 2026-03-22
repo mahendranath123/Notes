@@ -1,0 +1,6 @@
+/ip firewall filter add action=accept chain=input comment="allow known server for api only" dst-port=8728 protocol=tcp src-address=103.123.225.13
+/ip firewall filter add action=accept chain=input comment="allow known server for api only" dst-port=8728 protocol=tcp src-address=202.179.86.202
+/ip firewall filter add action=accept chain=input comment="allow known server for api only" dst-port=8728 protocol=tcp src-address=65.0.148.63
+/ip firewall filter add action=accept chain=input comment="allow known server for api only" dst-port=8728 protocol=tcp src-address=65.1.237.74
+/ip firewall filter add action=accept chain=input comment="allow known server for api only" dst-port=8728 protocol=tcp src-address=13.234.103.77
+/ip firewall filter add action=drop chain=input comment="drop rest of api traffic" dst-port=8728 protocol=tcp
