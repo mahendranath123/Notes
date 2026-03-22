@@ -1,0 +1,199 @@
+1: create zabbix docker network
+sudo docker network create --subnet 172.20.214.0/24 --ip-range 172.20.214.0/24 zabbix-net
+
+2: create database container with storage at "/home/user/storage/zabbix_DB_data" on IP 10.10.108.14 (change as required):
+sudo docker run -d --name zabbix-timescaleDB \
+     -v /home/user/storage/zabbix_DB_data:/var/lib/postgresql/data \
+     -e POSTGRES_PASSWORD="zabbix@@2025" \
+     -e TIMESCALEDB_TELEMETRY=off \
+     -e TZ="Asia/Kolkata" \
+     --restart unless-stopped \
+     --network=zabbix-net \
+     -p 10.10.108.14:5432:5432 \
+     timescale/timescaledb:2.22.1-pg17
+
+3: Connect to DB server to create zabbix database:
+sudo psql -h 10.10.108.14 -p 5432 -U postgres -d postgres
+CREATE USER zabbix WITH PASSWORD 'zabbix2025';
+CREATE DATABASE zabbix OWNER zabbix ENCODING 'Unicode' TEMPLATE template0;
+ALTER DATABASE zabbix SET work_mem = '4GB';
+ALTER SYSTEM SET max_connections TO '600';
+ALTER SYSTEM SET max_wal_size = '2GB';
+ALTER SYSTEM SET min_wal_size = '1GB';
+ALTER SYSTEM SET checkpoint_completion_target = '0.9';
+SELECT pg_reload_conf();
+quit;
+
+4: install core zabbix server:
+sudo docker run --name zabbix-server-pgsql -t \
+                 -e ZBX_ALLOWUNSUPPORTEDDBVERSIONS=0 \
+                 -e DB_SERVER_HOST="zabbix-timescaleDB" \
+                 -e POSTGRES_DB="zabbix" \
+                 -e POSTGRES_USER="zabbix" \
+                 -e POSTGRES_PASSWORD="zabbix2025" \
+                 -e DB_SERVER_PORT=5432 \
+                 -e ZBX_SERVER_NAME="zabbix" \
+                 -e ZBX_LISTENPORT=10051 \
+                 -e ZBX_STARTPOLLERS=200 \
+                 -e ZBX_STARTIPMIPOLLERS=2 \
+                 -e ZBX_STARTSNMPPOLLERS=100 \
+                 -e ZBX_STARTCONNECTORS=1 \
+                 -e ZBX_STARTTRAPPERS=5 \
+                 -e ZBX_STARTPOLLERSUNREACHABLE=100 \
+                 -e ZBX_STARTPINGERS=100 \
+                 -e ZBX_STARTHISTORYPOLLERS=50 \
+                 -e ZBX_STARTDISCOVERERS=80 \
+                 -e ZBX_STARTALERTERS=5 \
+                 -e ZBX_CACHESIZE=450M \
+                 -e ZBX_STARTDBSYNCERS=35 \
+                 -e ZBX_HISTORYCACHESIZE=150M \
+                 -e ZBX_HISTORYINDEXCACHESIZE=100M \
+                 -e ZBX_TRENDCACHESIZE=150M \
+                 -e ZBX_TRENDFUNCTIONCACHESIZE=10M \
+                 -e ZBX_VALUECACHESIZE=1G \
+                 -e ZBX_STATSALLOWEDIP="127.0.0.1" \
+                 -e ZBX_STARTREPORTWRITERS=3 \
+                 -e ZBX_WEBSERVICEURL=http://127.0.0.1:10054/report \
+                 -e ZBX_ENABLEGLOBALSCRIPTS=1 \
+                 --network=zabbix-net \
+                 --cap-add=net_raw --init \
+                 -e TZ="Asia/Kolkata" \
+                 -p 10051:10051 \
+                 --restart unless-stopped \
+                 -d zabbix/zabbix-server-pgsql:alpine-7.0-latest
+
+4: install zabbix agent:
+sudo docker run --name zabbix-agent \
+             -e ZBX_HOSTNAME="Zabbix server" \
+             -e ZBX_SERVER_HOST="zabbix-server-pgsql" \
+             -e ZBX_ACTIVE_ALLOW="True" \
+             --network=zabbix-net \
+             --privileged \
+             --init \
+             --restart unless-stopped \
+             -e TZ="Asia/Kolkata" \
+             -d zabbix/zabbix-agent:alpine-7.0-latest
+
+5: install zabbix web-service component
+sudo docker run --name zabbix-web-service \
+             -e ZBX_ALLOWEDIP="zabbix-server-pgsql" \
+             -e ZBX_LISTENPORT=10053 \
+             --cap-add=SYS_ADMIN \
+             --network=zabbix-net \
+             --restart unless-stopped \
+             -p 127.0.0.1:10053:10053 \
+             -e TZ="Asia/Kolkata" \
+             -d zabbix/zabbix-web-service:alpine-7.0-latest
+
+6: install zabbix frontend apache component (ssl.crt & ssl.key at /home/user/ssl-certs)
+sudo chown root:root /home/user/ssl-certs/*
+sudo chmod 600 /home/user/ssl-certs/*
+sudo docker run --name zabbix-web-apache-pgsql \
+              -v /home/user/ssl-certs:/etc/ssl/apache2 \
+              -e ZBX_SERVER_HOST="zabbix-server-pgsql" \
+              -e ZBX_SERVER_NAME="zabbix" \
+              -e DB_SERVER_HOST="zabbix-timescaleDB" \
+              -e POSTGRES_DB="zabbix" \
+              -e POSTGRES_USER="zabbix" \
+              -e POSTGRES_PASSWORD="zabbix2025" \
+              -e DB_SERVER_PORT=5432 \
+              -e ZBX_MAXEXECUTIONTIME=1000 \
+              -e ZBX_MEMORYLIMIT=500M \
+              -e ZBX_MAXINPUTTIME=800 \
+              -e ZBX_POSTMAXSIZE=250M \
+              -e ZBX_UPLOADMAXFILESIZE=100M \
+              -e ENABLE_WEB_ACCESS_LOG="false" \
+              -e EXPOSE_WEB_SERVER_INFO="off" \
+              -e PHP_TZ="Asia/Kolkata" \
+              -e TZ="Asia/Kolkata" \
+              --network=zabbix-net \
+              -p 2080:8080 \
+              -p 2443:8443 \
+              --restart unless-stopped \
+              -d zabbix/zabbix-web-apache-pgsql:alpine-7.0-latest
+
+--------------------------------------------
+Zabbix Proxy DB servers
+--------------------------------------------
+sudo docker run --name zabbix-mysql-proxy-server1 -t \
+       -e MYSQL_ROOT_PASSWORD="zabbix@@2025" \
+       -e TZ="Asia/Kolkata" \
+       --restart unless-stopped \
+       --network=zabbix-net \
+       -p 5540:3306 \
+       -d mysql:8.0-oracle
+
+sudo docker run --name zabbix-mysql-proxy-server2 -t \
+       -e MYSQL_ROOT_PASSWORD="zabbix@@2025" \
+       -e TZ="Asia/Kolkata" \
+       --restart unless-stopped \
+       --network=zabbix-net \
+       -p 5541:3306 \
+       -d mysql:8.0-oracle
+
+--------------------------------------------
+Zabbix Proxy Servers
+--------------------------------------------
+sudo docker run --name zabbix-proxy-server1 -t \
+         -e ZBX_PROXYMODE=0 \
+         -e ZBX_SERVER_HOST="zabbix-server-pgsql" \
+         -e ZBX_SERVER_PORT=10052 \
+         -e DB_SERVER_HOST="zabbix-mysql-proxy-server1" \
+         -e DB_SERVER_PORT=3306 \
+         -e MYSQL_DATABASE="zabbix_proxy1" \
+         -e MYSQL_ROOT_PASSWORD="zabbix@@2025" \
+         -e MYSQL_USER="zabbix" \
+         -e MYSQL_PASSWORD="zabbix@@2025" \
+         -e ZBX_HOSTNAME="zabbix-proxy1" \
+         -e ZBX_LISTENPORT=10051 \
+         -e ZBX_PROXYOFFLINEBUFFER=1 \
+         -e ZBX_PROXYBUFFERMODE="hybrid" \
+         -e ZBX_PROXYMEMORYBUFFERSIZE=16M \
+         -e ZBX_STARTPOLLERS=400 \
+         -e ZBX_STARTSNMPPOLLERS=300 \
+         -e ZBX_STARTPOLLERSUNREACHABLE=200 \
+         -e ZBX_STARTPINGERS=200 \
+         -e ZBX_STARTDISCOVERERS=80 \
+         -e ZBX_CACHESIZE=500M \
+         -e ZBX_STARTDBSYNCERS=10 \
+         -e ZBX_HISTORYCACHESIZE=100M \
+         -e ZBX_HISTORYINDEXCACHESIZE=100M \
+         -e ZBX_STATSALLOWEDIP="127.0.0.1" \
+         -e ZBX_ENABLEREMOTECOMMANDS=1 \
+         --cap-add=net_raw \
+         -e TZ="Asia/Kolkata" \
+         --network=zabbix-net \
+         --restart unless-stopped \
+         -d zabbix/zabbix-proxy-mysql:alpine-7.0-latest
+
+sudo docker run --name zabbix-proxy-server2 -t \
+         -e ZBX_PROXYMODE=0 \
+         -e ZBX_SERVER_HOST="zabbix-server-pgsql" \
+         -e ZBX_SERVER_PORT=10052 \
+         -e DB_SERVER_HOST="zabbix-mysql-proxy-server2" \
+         -e DB_SERVER_PORT=3306 \
+         -e MYSQL_DATABASE="zabbix_proxy2" \
+         -e MYSQL_ROOT_PASSWORD="zabbix@@2025" \
+         -e MYSQL_USER="zabbix" \
+         -e MYSQL_PASSWORD="zabbix@@2025" \
+         -e ZBX_HOSTNAME="zabbix-proxy2_core" \
+         -e ZBX_LISTENPORT=10051 \
+         -e ZBX_PROXYOFFLINEBUFFER=1 \
+         -e ZBX_PROXYBUFFERMODE="hybrid" \
+         -e ZBX_PROXYMEMORYBUFFERSIZE=16M \
+         -e ZBX_STARTPOLLERS=400 \
+         -e ZBX_STARTSNMPPOLLERS=300 \
+         -e ZBX_STARTPOLLERSUNREACHABLE=200 \
+         -e ZBX_STARTPINGERS=200 \
+         -e ZBX_STARTDISCOVERERS=80 \
+         -e ZBX_CACHESIZE=500M \
+         -e ZBX_STARTDBSYNCERS=10 \
+         -e ZBX_HISTORYCACHESIZE=100M \
+         -e ZBX_HISTORYINDEXCACHESIZE=100M \
+         -e ZBX_STATSALLOWEDIP="127.0.0.1" \
+         -e ZBX_ENABLEREMOTECOMMANDS=1 \
+         --cap-add=net_raw \
+         --network=zabbix-net \
+         --restart unless-stopped \
+         -d zabbix/zabbix-proxy-mysql:alpine-7.0-latest
+
