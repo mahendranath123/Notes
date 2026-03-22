@@ -1,0 +1,44 @@
+
+#### 01: installer script
+curl -L -s https://raw.githubusercontent.com/centreon/centreon/25.10-latest/centreon/unattended.sh | sh
+#### 02: centreon installer script generated output DB root password:
+As you will need a password for the user [root] on your  database system, a random password is generated
+Passwords are currently saved in [/etc/centreon/generated.tobesecured]
+Random password generated for user [Database user: root] is [fw03G**VA?!Zf93p]
+#### 03: complete web installation wizard "http://<ip>/centreon" using above generated DB root password and for example use web password "Centreon@123"
+#### 04: modify for large scale hosts
+nano /etc/centreon-engine/centengine.cfg
+use_large_installation_tweaks=1
+enable_environment_macros=0
+use_setpgid=0
+check_result_reaper_frequency=1
+#### 05: optimise mariaDB
+nano /etc/my.cnf.d/centreon.cnf
+innodb_buffer_pool_size=1G
+#### 06: sudo reboot and login to webpage
+#### 07: goto Configuration > Connectors > Monitoring Connectors
+enable/activate "Base Pack"
+#### 08: goto Configuration  >  Commands  >  Checks
+Create new:
+Command Name: check_icmp
+Command line: $USER1$/check_icmp -H $HOSTADDRESS$ -w 200.0,20% -c 500.0,50% -n 2
+Save
+#### 09: goto Configuration  >  Hosts  >  Templates
+a: Go inside all templates, for Check Period select 24x7 and save.
+b: For template "generic-active-host-custom" (which has Linked Services Templates value 1) select timezone Asia/Kolkata, check command select "check_icmp", Check period "24x7", Max Check Attempts 3 , Normal Check Interval 2,  Retry Check Interval 1. Save
+#### 10: goto Configuration  >  Services  >  Templates
+in template "Base-Ping-LAN-custom", Check period "24x7", Max Check Attempts 3 , Normal Check Interval 2,  Retry Check Interval 1. Save
+#### 11: create host group "jeebr"
+#### 12: export all to poller and restart poller
+#### 13: file "import_to_2510.clapi.txt" has all old centreon hosts with applied template "generic-active-host-custom", poller "Central" and host group "jeebr"
+#### 14: import hosts into centreon by CLAPI: (this can take time)
+/usr/bin/centreon -u admin -p 'Centreon@123' -i import_to_2510.clapi.txt
+#### 15: generate services for each host by CLAPI: (this can take lot of time)
+for host in $(/usr/bin/centreon -u admin -p 'Centreon@123' -o HOST -a show | cut -d';' -f2 | grep -v "name"); do
+    /usr/bin/centreon -u admin -p 'Centreon@123' -o HOST -a applytpl -v "$host"
+done
+#### 16: export config to poller with poller restart (tick mark all)
+#### DONE monitor the hosts count.
+
+
+
