@@ -1,0 +1,35 @@
+https://filebrowser.org/installation
+
+https://filebrowser.org/configuration.html
+
+
+
+default uid gid: 1000
+
+
+
+    -e PUID=$(id -u) \
+
+    -e PGID=$(id -g) \
+
+
+
+
+
+sudo docker run -d \
+
+	--name file-browser \
+
+    -v /home/psndna88/StorageSpace/PSN_NAS:/srv \
+
+    -v /home/psndna88/docker_files/file-browser/database:/database \
+
+    -v /home/psndna88/docker_files/file-browser/config:/config \
+
+	--restart=unless-stopped \
+
+    -p 192.168.112.2:8560:80 \
+
+    filebrowser/filebrowser:latest
+
+
