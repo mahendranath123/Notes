@@ -1,0 +1,30 @@
+# 1: create ipset
+firewall-cmd --permanent --new-ipset=whitelist_pools --type=hash:net
+# 2: add all whitelisted networks from dns_whitelist_pools.txt in ipset
+while read p; do firewall-cmd --permanent --ipset=whitelist_pools --add-entry=$p; done < dns_whitelist_pools.txt
+# 3: use the ipset to setup allow rule
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source ipset="whitelist_pools" port port="53" protocol="udp" accept'
+firewall-cmd --permanent --remove-service=dns
+# 4: allow ssh on jeebr noc IP pool only
+firewall-cmd --permanent --remove-service=ssh
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="103.123.226.0/29" port protocol="tcp" port="22" accept'
+# 5 drop all other traffic
+firewall-cmd --permanent --set-target=DROP
+# 6 apply rules
+firewall-cmd --reload
+
+------------------------------------------
+# show existing rules
+firewall-cmd --list-rich-rules
+------------------------------------------
+other optional:
+
+# allow ping from jeebr noc IP pool only
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="103.123.226.0/29" protocol value="icmp" accept'
+# allow http/s ports from jeebr noc IP pool only
+firewall-cmd --permanent --remove-service=http
+firewall-cmd --permanent --remove-service=https
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="103.123.226.0/29" port protocol="tcp" port="80" accept'
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="103.123.226.0/29" port protocol="tcp" port="443" accept'
+firewall-cmd --permanent --set-target=DROP
+firewall-cmd --reload
