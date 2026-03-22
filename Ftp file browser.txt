@@ -1,0 +1,62 @@
+### create users
+sudo docker run --name pure-ftpd-backups-server \
+    -v /home/jeebr/storage/docker-pure-ftp-server/passwd:/etc/pure-ftpd/passwd \
+    -e FTP_USER_NAME="jnpl_backups" \
+    -e FTP_USER_PASS="jeebr@@5678" \
+    -e FTP_USER_HOME=/home/ftpusers/jnpl_backups \
+    -e FTP_USER_UID=1000 \
+    -e FTP_USER_GID=1000 \
+    -e TZ=Asia/Kolkata \
+    stilliard/pure-ftpd:latest
+
+sudo docker run -d --name pure-ftpd-backups-server \
+    -v /home/jeebr/storage/docker-pure-ftp-server/passwd:/etc/pure-ftpd/passwd \
+	-v /home/jeebr/storage/docker-pure-ftp-server/banner.txt:/etc/pure-ftpd/banner.txt \
+	-v /home/jeebr/storage/docker-pure-ftp-server/home:/home/ftpusers \
+	-v /home/jeebr/storage/MikroTik_Backups_Storage:/home/ftpusers/jnpl_backups \
+	-e FTP_MAX_CLIENTS=100 \
+	-e FTP_MAX_CONNECTIONS=100 \
+	-e TZ=Asia/Kolkata \
+	-e FTP_PASSIVE_PORTS=10100:10200 \
+	-e PUBLICHOST="10.10.108.14" \
+	-e "ADDED_FLAGS=-H -I 30 -F /etc/pure-ftpd/banner.txt" \
+	-p 10.10.108.14:6600:21 \
+	-p 10.10.108.14:10100-10200:10100-10200 \
+	-p 172.31.2.249:6600:21 \
+	-p 172.31.2.249:10100-10200:10100-10200 \
+	--restart unless-stopped \
+	stilliard/pure-ftpd:latest
+
+sudo docker run -d \
+	--name http-file-browser \
+    -v /home/jeebr/storage/docker-file-browser/database:/database \
+    -v /home/jeebr/storage/docker-file-browser/config:/config \
+    -v /home/jeebr/storage/docker-file-browser/userdata:/srv \
+	--restart=unless-stopped \
+    -p 10.10.108.14:6996:80 \
+    filebrowser/filebrowser:latest
+
+sudo docker run -d \
+	--name backups-file-browser \
+    -v /home/jeebr/storage/docker-backups-file-browser/database:/database \
+    -v /home/jeebr/storage/docker-backups-file-browser/config:/config \
+    -v /home/jeebr/storage/MikroTik_Backups_Storage:/srv \
+	--restart=unless-stopped \
+	--user "1000:1000" \
+    -p 10.10.108.14:3333:80 \
+    filebrowser/filebrowser:latest
+
+http://10.10.108.14:3333
+admin
+nocc@#****#***2
+jnpl
+JnsiA_RbeeJ$301$
+---------------------------------------------------
+Jeebr MikroTik AutoBackups page:
+http://10.10.108.14:3333
+jnpl
+JnsiA_RbeeJ$301$
+
+This shows mikrotik backup files auto uploaded to ftp server regularly
+(made in zabbix server 10.10.108.14)
+---------------------------------------------------
