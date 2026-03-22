@@ -1,0 +1,60 @@
+https://hub.docker.com/r/ubuntu/bind9
+https://bind9.readthedocs.io/en/latest/reference.html
+
+sudo docker run -d --name bind-dns-server \
+    -v /home/psndna88/docker_files/bind/named.conf:/etc/bind/named.conf \
+    -v /home/psndna88/docker_files/bind/named.conf.options:/etc/bind/named.conf.options \
+    -v /home/psndna88/docker_files/bind/cache:/var/cache/bind \
+    -v /home/psndna88/docker_files/bind/resource_records:/var/lib/bind \
+    -e TZ=Asia/Kolkata \
+    -p 192.168.112.4:53:53 \
+    -p 192.168.112.4:53:53/udp \
+    --restart unless-stopped \
+    ubuntu/bind9:latest -4
+
+sudo chown -R 999:999 /home/psndna88/docker_files/bind
+sudo chmod -R 777 /home/psndna88/docker_files/bind
+
+---------------------------------------------------------------------
+------/home/psndna88/docker_files/bind/named.conf.options------------
+options {
+        directory "/var/cache/bind";
+        // forwarders {
+        //      0.0.0.0;
+        // };
+        dnssec-validation auto;
+        listen-on port 53 { any; };
+        listen-on-v6 { none; };
+        allow-recursion { trusted; };
+        recursion yes;
+        auth-nxdomain yes;
+        qname-minimization off;
+};
+---------------------------------------------------------------------
+-------/home/psndna88/docker_files/bind/named.conf:------------------
+//tls ssl {
+//      key-file "/home/psndna88/sslcerts/psndna88.in/cert.key";
+//      cert-file "/home/psndna88/sslcerts/psndna88.in/cert.crt";
+//      ca-file "/home/psndna88/sslcerts/psndna88.in/CA.cer";
+//};
+acl trusted { any; };
+include "/etc/bind/named.conf.options";
+include "/etc/bind/named.conf.local";
+include "/etc/bind/named.conf.default-zones";
+---------------------------------------------------------------------
+
+Parameter	                                            Description
+-e TZ=Asia/Kolkata	                                            Timezone.
+-p 30053:53	                                            Expose bind9 on localhost:30053.
+-e BIND9_USER=bind	                                    The user which will start the named process.
+-v /path/to/bind/configuration:/etc/bind/named.conf	    Local configuration file⁠ named.conf (try this example⁠).
+-v /path/to/cached/data:/var/cache/bind	                Location where locally cached data can be dumped.
+-v /path/to/resource/records:/var/lib/bind	            Location of Resource Records defining various domain information.
+
+-v /home/psndna88/docker_files/bind/named.conf.default-zones:/etc/bind/named.conf.default-zones \
+
+To debug the container:
+docker logs -f bind9-container
+
+To get an interactive shell:
+docker exec -it bind9-container /bin/bash
