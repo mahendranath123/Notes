@@ -1,33 +1,45 @@
 Centreon 25.10 Backup and Restore Instructions as root:
 
-##### Create Backup with historical data:
+##### Create Backup:
 mysqldump -u root -p --single-transaction --routines --triggers --databases centreon centreon_storage | gzip > centreon_25_10_backup.sql.gz
-OR
-##### Create Backup without historical data:
-mysqldump -u root -p --single-transaction --routines --triggers --databases centreon | gzip > centreon_25_10_backup.sql.gz
 
 ##### Restore Backup:-
 # 1: Stop Centreon services
-systemctl stop cbd centengine gorgoned httpd
+systemctl stop cbd.service
+systemctl stop centengine.service
+systemctl stop centreon.service
+systemctl stop centreontrapd.service
+systemctl stop gorgoned.service
+systemctl stop httpd.service
 # 2: Log into MySQL and clear the "default" empty databases:
 mysql -u root -p
 DROP DATABASE centreon;
 DROP DATABASE centreon_storage;
 CREATE DATABASE centreon;
 CREATE DATABASE centreon_storage;
+GRANT ALL PRIVILEGES ON centreon_storage.* TO 'centreon'@'localhost';
+GRANT ALL PRIVILEGES ON centreon.* TO 'centreon'@'localhost';
+FLUSH PRIVILEGES;
 EXIT;
 # 3: Extract and import DBs in one step:
-zcat centreon_25_10_backup.sql.gz | mysql -u root -p
+(echo "SET FOREIGN_KEY_CHECKS=0; SET UNIQUE_CHECKS=0; SET AUTOCOMMIT=0;"; zcat centreon_25_10_backup.sql.gz; echo "COMMIT; SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1;") | mysql -u root -p
 # 4: Since 25.10 has specific schema requirements, always run the following to ensure the internal table pointers are correct after a move:
 mysql_upgrade -u root -p
-# 5: (Optional) Update Config Files for DB credentials: edit /etc/centreon/centreon.conf.php and /etc/centreon/config.d/10-database.yaml
+# 5: (OPTIONAL) Update Config Files for DB credentials: edit /etc/centreon/centreon.conf.php and /etc/centreon/config.d/10-database.yaml
 mysql -u root -p
 ALTER USER 'centreon'@'localhost' IDENTIFIED BY 'your_password';
 GRANT ALL PRIVILEGES ON centreon.* TO 'centreon'@'localhost' IDENTIFIED BY 'your_password';
 GRANT ALL PRIVILEGES ON centreon_storage.* TO 'centreon'@'localhost';
-GRANT ALL PRIVILEGES ON centreon_status.* TO 'centreon'@'localhost';
+GRANT ALL PRIVILEGES ON centreon.* TO 'centreon'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 # 6: Start Services:
-systemctl restart mariadb
-systemctl start gorgoned centengine cbd httpd
+systemctl restart mariadb.service
+systemctl start cbd.service
+systemctl start centengine.service
+systemctl start centreon.service
+systemctl start centreontrapd.service
+systemctl start gorgoned.service
+systemctl start httpd.service
+su - apache -s /bin/bash -c "/usr/share/centreon/bin/console cache:clear"
+# 7: export config to poller with poller restart (tick mark all)
