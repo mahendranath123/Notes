@@ -1,0 +1,22 @@
+###### MikroTik Backups FTP-uploader v1.4 RouterOS v7 #######
+################# Parvinder (c) 2025 ########################
+
+:local NASname "sme_air_14516_Backup_FourStar_MKT"
+:local NASip "10.10.101.186"
+
+#########################
+:local FTPserver "10.10.108.14"
+:local FTPport "6600"
+:local FTPuser "jnpl_backups"
+:local FTPpass "jeebr@@5678"
+#########################
+
+:local backupName ("NAS" . "_" . $NASname . "_" . $NASip)
+:local filenameRSC ($backupName . ".rsc")
+:local filenameBKP ($backupName . ".backup")
+
+/export show-sensitive file="$filenameRSC"
+
+/tool fetch mode=ftp address=$FTPserver port=$FTPport user=$FTPuser password=$FTPpass src-path="$filenameRSC" dst-path="/$filenameRSC" upload=yes
+/system backup save name="$backupName"
+/tool fetch mode=ftp address=$FTPserver port=$FTPport user=$FTPuser password=$FTPpass src-path="$filenameBKP" dst-path="/$filenameBKP" upload=yes
