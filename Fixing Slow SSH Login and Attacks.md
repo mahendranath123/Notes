@@ -27,11 +27,11 @@ systemctl restart sshd
 
 ---
 
-## Step 2: Stop Brute-Force Attacks with Fail2Ban
+# Step 2: Install and Configure Fail2Ban
 
-If your server is exposed to the internet, automated bots constantly attempt SSH logins. Fail2Ban helps block repeated failed login attempts automatically.
+Fail2Ban automatically blocks IP addresses that repeatedly fail SSH login attempts.
 
-### Install EPEL Repository and Fail2Ban
+## Install EPEL Repository and Fail2Ban
 
 For Rocky Linux, AlmaLinux, or other RHEL-based systems:
 
@@ -40,33 +40,96 @@ dnf install epel-release -y
 dnf install fail2ban -y
 ```
 
-### Enable and Start Fail2Ban
+---
+
+## Create Fail2Ban Configuration
+
+Create the configuration file:
+
+```bash
+cat << 'EOF' > /etc/fail2ban/jail.local
+[DEFAULT]
+bantime = 86400
+findtime = 600
+maxretry = 3
+
+[sshd]
+enabled = true
+port = ssh
+backend = systemd
+EOF
+```
+
+### Configuration Explanation
+
+- `bantime = 86400`  
+  Ban IPs for 24 hours
+
+- `findtime = 600`  
+  Count failed attempts within 10 minutes
+
+- `maxretry = 3`  
+  Ban after 3 failed login attempts
+
+---
+
+## Enable and Start Fail2Ban
 
 ```bash
 systemctl enable --now fail2ban
 ```
 
-### Verify Fail2Ban Status
+---
+
+## Restart Fail2Ban
+
+Now restart the service after creating the configuration:
+
+```bash
+systemctl restart fail2ban
+```
+
+---
+
+## Verify Fail2Ban Status
+
+Check whether the service started successfully:
 
 ```bash
 systemctl status fail2ban
 ```
 
-### Check Active Bans
+---
+
+## Check Active SSH Jail
 
 ```bash
 fail2ban-client status sshd
 ```
 
+Example output:
+
+```bash
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed: 0
+|  |- Total failed: 15
+|  `- File list: /var/log/secure
+`- Actions
+   |- Currently banned: 3
+   |- Total banned: 3
+   `- Banned IP list: 192.168.1.100
+```
+
 ---
 
-## Step 3: Secure SSH Configuration
+# Step 3: Secure SSH Configuration
 
-### Change the Default SSH Port
+## Change the Default SSH Port
 
 Using a non-standard SSH port reduces automated scanning attempts.
 
-Edit the SSH configuration file:
+### Edit SSH Configuration
 
 ```bash
 vi /etc/ssh/sshd_config
@@ -98,19 +161,17 @@ ssh -p 2244 user@server-ip
 
 ---
 
-## Step 4: Disable Root Password Login
+# Step 4: Disable Root Password Login
 
 Using passwords for root login is highly risky. SSH key authentication is strongly recommended.
 
-### Disable Password Authentication
-
-Edit the SSH configuration:
+## Edit SSH Configuration
 
 ```bash
 vi /etc/ssh/sshd_config
 ```
 
-Update or add:
+Add or update:
 
 ```conf
 PermitRootLogin no
@@ -126,7 +187,7 @@ systemctl restart sshd
 
 ---
 
-## Step 5: Allow New SSH Port in Firewall
+# Step 5: Allow New SSH Port in Firewall
 
 If firewalld is enabled, allow the new SSH port before disconnecting.
 
@@ -144,7 +205,7 @@ firewall-cmd --reload
 
 ---
 
-## Step 6: SELinux Configuration for Custom SSH Port
+# Step 6: Configure SELinux for Custom SSH Port
 
 If SELinux is enabled, allow the new SSH port:
 
@@ -160,7 +221,7 @@ dnf install policycoreutils-python-utils -y
 
 ---
 
-## Verify SSH Listening Port
+# Verify SSH Listening Port
 
 ```bash
 ss -tulnp | grep ssh
@@ -174,7 +235,7 @@ tcp   LISTEN  0  128  0.0.0.0:2244  0.0.0.0:*  users:(("sshd",pid=1234,fd=3))
 
 ---
 
-## Recommended Security Practices
+# Recommended Security Practices
 
 - Use SSH key authentication
 - Disable root login
@@ -185,7 +246,7 @@ tcp   LISTEN  0  128  0.0.0.0:2244  0.0.0.0:*  users:(("sshd",pid=1234,fd=3))
 
 ---
 
-## Important Warning
+# Important Warning
 
 Before closing your current SSH session:
 
