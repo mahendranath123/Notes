@@ -48,16 +48,22 @@ Create the configuration file:
 
 ```bash
 cat << 'EOF' > /etc/fail2ban/jail.local
+
+ignoreip = 127.0.0.1/8 ::1 103.25.44.211 
 [DEFAULT]
+# Ban IP for 24 hours (86400 seconds)
 bantime = 86400
+# Window of time to track failed attempts (10 minutes)
 findtime = 600
+# Number of failures before a ban is triggered
 maxretry = 3
 
 [sshd]
 enabled = true
-port = ssh
+port = 4040
 backend = systemd
 EOF
+
 ```
 
 ### Configuration Explanation
@@ -105,6 +111,10 @@ systemctl status fail2ban
 
 ```bash
 fail2ban-client status sshd
+```
+## Verify the IPs are whitelisted
+```bash
+fail2ban-client get sshd ignoreip
 ```
 
 Example output:
