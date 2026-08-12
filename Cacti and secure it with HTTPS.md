@@ -83,3 +83,60 @@ certbot --apache -d mrtg.jeebr.net
 ```
 
 *(Select Option 2 when prompted to redirect all HTTP traffic to HTTPS).*
+
+Yes, you can easily automate the SSL renewal. Let's Encrypt certificates are valid for 90 days, but Certbot has a built-in command to renew them automatically before they expire.
+
+Since you are on Rocky Linux, the best way to handle this is by using the built-in systemd timer, or by adding a simple line to your crontab.
+
+Here is how to set up and verify the automatic renewal:
+
+### 1. Test the Renewal Process (Dry Run)
+
+Before automating it, it is best practice to run a "dry run." This tests the renewal process without actually changing your live certificate to ensure there are no errors.
+
+```bash
+certbot renew --dry-run
+
+```
+
+*If this command outputs `Congratulations, all simulated renewals succeeded`, you are ready to automate.*
+
+### 2. Enable the Auto-Renewal Timer (Recommended)
+
+Rocky Linux automatically installs a background timer for Certbot. We just need to make sure it is permanently enabled and actively running.
+
+Run these commands in order:
+
+```bash
+# Enable the timer to start automatically if the server reboots
+systemctl enable certbot-renew.timer
+
+# Start the timer right now
+systemctl start certbot-renew.timer
+
+# Verify it is actively running
+systemctl status certbot-renew.timer
+
+```
+
+*You should see the status as **Active: active (waiting)**. This timer wakes up twice a day, checks if the certificate is within 30 days of expiration, and renews it automatically if needed.*
+
+### 3. Alternative Method: Use Crontab
+
+If you prefer to explicitly control the renewal schedule using a standalone crontab entry (which works perfectly alongside your SSL monitoring script), you can do so manually.
+
+Open your crontab:
+
+```bash
+crontab -e
+
+```
+
+Add this line to run the renewal check daily at 2:00 AM. The `--quiet` flag ensures it only outputs a message if an error occurs:
+
+```text
+0 2 * * * /usr/bin/certbot renew --quiet
+
+```
+
+With either the system timer or the crontab method active, your SSL certificate will automatically renew itself before the 90-day expiration window, ensuring your HTTPS connection never drops.
