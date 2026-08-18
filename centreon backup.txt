@@ -54,5 +54,10 @@ mysql -u root -p -e "ALTER TABLE centreon_storage.resources ADD COLUMN is_module
 mysql -u root -p -e "ALTER TABLE centreon_storage.resources ADD INDEX resources_status_filter_idx (status);"
 
 
+## free  /var  disk  space
+
+ mysql -u root -p -e "TRUNCATE TABLE centreon_storage.data_bin;"
+
+
 Run this command via SSH (it will prompt for your MySQL root password) to add the missing resources_name_search_idx index to the name column:
 mysql -u root -p -e "ALTER TABLE centreon_storage.resources ADD INDEX resources_name_search_idx (name);"
