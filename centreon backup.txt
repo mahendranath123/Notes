@@ -43,3 +43,16 @@ systemctl start gorgoned.service
 systemctl start httpd.service
 su - apache -s /bin/bash -c "/usr/share/centreon/bin/console cache:clear"
 # 7: export config to poller with poller restart (tick mark all)
+
+# 8 Error  following cmd
+new   pv centreon_25_10_backup.sql.gz | zcat | mysql -u root -p
+
+centreon_storage database to add the missing column and index.
+
+mysql -u root -p -e "ALTER TABLE centreon_storage.resources ADD COLUMN is_module TINYINT(1) NOT NULL DEFAULT 0;"
+
+mysql -u root -p -e "ALTER TABLE centreon_storage.resources ADD INDEX resources_status_filter_idx (status);"
+
+
+Run this command via SSH (it will prompt for your MySQL root password) to add the missing resources_name_search_idx index to the name column:
+mysql -u root -p -e "ALTER TABLE centreon_storage.resources ADD INDEX resources_name_search_idx (name);"
